@@ -1,0 +1,316 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-background: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #141414;
+  --color-surface-3: #1a1a1a;
+  --color-border: #333333;
+  --color-border-bright: #555555;
+
+  --color-text: #ffffff;
+  --color-text-muted: #888888;
+  --color-text-dim: #444444;
+
+  --color-orange: #ff4500;
+  --color-orange-dim: #4a1400;
+  --color-orange-bg: #140500;
+
+  --color-green: #00ff66;
+  --color-green-dim: #003314;
+  --color-red: #ff0033;
+  --color-blue: #0066ff;
+  --color-yellow: #ffff00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbar until hover */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-background); border-left: 1px solid var(--color-border); }
+::-webkit-scrollbar-thumb { background: var(--color-border-bright); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-orange); }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+input, select, textarea, button {
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-orange) !important;
+}
+
+/* =========================================================================
+   RESPONSIVE LAYOUT
+   ------------------------------------------------------------------------
+   Every layout rule that has to change with viewport width lives here rather
+   than in a component's inline `style`. Two reasons: an inline style cannot
+   carry a media query at all, and it also outranks Tailwind's responsive
+   utilities — so a grid-template-columns written inline can never be
+   overridden at a breakpoint. Components keep their inline *colors* and
+   state-dependent styling; only sizing and flow moved.
+
+   Breakpoints:
+     1024px  side-by-side panels stack (calculator form vs summary)
+      900px  three-column expanded detail collapses
+      860px  the tab bar wraps to two rows
+      640px  phone: multi-column forms collapse, rows wrap
+   ========================================================================= */
+
+/* --- App header --------------------------------------------------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+@media (max-width: 860px) {
+  /* Pinned, the brand row plus the 2×2 tab grid occupied well over half of a
+     phone screen, leaving a third of it for the form being filled in. It
+     scrolls away instead; the calculator's fixed total bar keeps the primary
+     action reachable without it. */
+  .app-header { position: static; }
+}
+@media (max-width: 640px) {
+  .brand-sub { display: none; }
+}
+
+/* --- Tab bar ------------------------------------------------------------- */
+.tab-bar {
+  display: flex;
+}
+.tab-btn {
+  flex: 1;
+  padding: 16px 20px;
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-right: 1px solid var(--color-border);
+  transition: background 0.15s;
+}
+.tab-btn[data-active='true'] {
+  background: var(--color-text);
+  color: #000;
+}
+/* Hover only where a pointer can actually hover. On a touch screen the hover
+   state sticks after a tap, which made an inactive tab look selected. */
+@media (hover: hover) {
+  .tab-btn:hover:not([data-active='true']) {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+  .job-head:hover { background: var(--color-surface-2); }
+}
+@media (max-width: 860px) {
+  /* Four tabs cannot share one row legibly on a phone, so they form a 2×2 grid. */
+  .tab-bar { flex-wrap: wrap; }
+  .tab-btn { flex: 1 1 50%; padding: 14px 10px; font-size: 11px; letter-spacing: 0.08em; }
+}
+@media (max-width: 400px) {
+  .tab-btn { padding: 12px 6px; font-size: 10px; letter-spacing: 0.02em; }
+}
+
+/* --- Header metrics ----------------------------------------------------- */
+.header-metrics {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+@media (max-width: 860px) {
+  .header-metrics { gap: 16px; justify-content: space-between; width: 100%; }
+}
+
+/* --- Calculator --------------------------------------------------------- */
+.calc-layout {
+  display: grid;
+  align-items: start;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.calc-summary {
+  position: sticky;
+  top: 24px;
+}
+@media (max-width: 1024px) {
+  .calc-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    /* Clearance for the fixed total bar, so it never covers the last field. */
+    padding-bottom: 76px;
+  }
+  .calc-summary { position: static; }
+}
+
+/* Job name / client / quantity. The name needs the full width on a phone. */
+.ident-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 2fr 1fr 1fr;
+}
+@media (max-width: 640px) {
+  .ident-grid { grid-template-columns: minmax(0, 1fr) 96px; }
+  .ident-grid > :first-child { grid-column: 1 / -1; }
+}
+
+/* Material, color, price, weight. */
+.mat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .mat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Generic field rows that simply collapse. */
+.field-grid-3 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.field-grid-2 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .field-grid-3, .field-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Labor stages: one dense row on desktop, wrapped block on a phone. */
+.labor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.labor-name { flex: 2; min-width: 0; }
+.labor-num { flex: 1; min-width: 0; }
+.labor-scope { flex: 1; min-width: 0; cursor: pointer; }
+@media (max-width: 640px) {
+  .labor-row { flex-wrap: wrap; }
+  /* The row number and the "hrs @" connector are decoration that only makes
+     sense on one line; the inputs are self-describing without them. */
+  .labor-index, .labor-unit { display: none; }
+  /* Three lines: name, then hours + rate + remove, then scope. `order` keeps
+     the remove button with the numbers instead of orphaning it on its own row. */
+  .labor-name { flex: 1 1 100%; }
+  .labor-num { flex: 1 1 0; }
+  .labor-del { order: 2; }
+  .labor-scope { order: 3; flex: 1 1 100%; }
+}
+
+/* The summary panel is pushed below the form on a narrow screen, so the price
+   is repeated in a bar that stays in view while typing. */
+.calc-mobile-bar { display: none; }
+@media (max-width: 1024px) {
+  .calc-mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    padding: 10px 16px;
+    background: var(--color-surface);
+    border-top: 2px solid var(--color-orange);
+  }
+}
+
+/* --- Queue and history -------------------------------------------------- */
+/* auto-fit rather than a fixed count: four across on a desktop, two on a
+   phone, without a breakpoint per screen size. */
+.stat-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.filter-group {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-group > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 10px 16px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.filter-search { flex: 1; min-width: 0; }
+@media (max-width: 640px) {
+  .filter-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .filter-search { width: 100%; }
+  /* Tighter so the full set of filters fits a 375px screen without scrolling. */
+  .filter-group > button { padding: 10px 9px; font-size: 10px; letter-spacing: 0.02em; }
+}
+
+/* Job row header: name, status, price. */
+.job-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.job-head-main { flex: 1; min-width: 0; }
+.job-status { padding: 0 24px; }
+.job-price { text-align: right; min-width: 100px; }
+@media (max-width: 640px) {
+  .job-head { flex-wrap: wrap; row-gap: 10px; padding: 14px; gap: 10px; }
+  .job-head-main { flex: 1 1 100%; }
+  .job-status { padding: 0; }
+  /* Price to the far end of the second line, opposite the status badge. */
+  .job-price { margin-left: auto; min-width: 0; }
+}
+
+/* Expanded detail: breakdown, log, actions. */
+.detail-grid {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 190px;
+}
+@media (max-width: 900px) {
+  .detail-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+}
+
+/* --- Filament form ------------------------------------------------------ */
+.form-grid-auto {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* --- Touch input sizing ------------------------------------------------- */
+@media (max-width: 640px) {
+  /* iOS Safari zooms the page when a focused field's text is under 16px, which
+     leaves the layout shifted after the keyboard closes. Inline font sizes on
+     these inputs win over a class, hence the override. */
+  input, select, textarea { font-size: 16px !important; }
+}
+

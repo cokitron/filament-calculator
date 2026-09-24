@@ -1,0 +1,314 @@
+import { useState, useEffect, useCallback } from 'react'
+import Calculator from './components/Calculator'
+import Queue from './components/Queue'
+import History from './components/History'
+import Filaments from './components/Filaments'
+import { PrintJob, Filament } from './types'
+import { computeCosts, formatMXN } from './pricing'
+import * as db from './db/client'
+import type { JobHistoryEntry } from './db/client'
+
+type Tab = 'calculator' | 'queue' | 'history' | 'filaments'
+
+type DbState =
+  | { phase: 'opening' }
+  | { phase: 'ready' }
+  | { phase: 'failed'; message: string }
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<Tab>('calculator')
+  const [dbState, setDbState] = useState<DbState>({ phase: 'opening' })
+  const [filaments, setFilaments] = useState<Filament[]>([])
+  const [queue, setQueue] = useState<PrintJob[]>([])
+  const [history, setHistory] = useState<JobHistoryEntry[]>([])
+
+  const refresh = useCallback(async () => {
+    // The queue holds work in progress; finished jobs move to the history log
+    // and are read separately, with the totals frozen at completion.
+    const [active, past, fils] = await Promise.all([
+      db.listActiveJobs(),
+      db.listJobHistory(),
+      db.listFilaments(),
+    ])
+    setQueue(active)
+    setHistory(past)
+    setFilaments(fils)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        await db.openDatabase()
+        // Lift anything the old localStorage version saved. Runs at most once;
+        // the database records that it happened.
+        await db.importLegacyIfNeeded()
+        if (cancelled) return
+        await refresh()
+        if (!cancelled) setDbState({ phase: 'ready' })
+      } catch (err) {
+        if (!cancelled) {
+          setDbState({ phase: 'failed', message: err instanceof Error ? err.message : String(err) })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [refresh])
+
+  const addToQueue = async (job: PrintJob) => {
+    await db.saveJob(job)
+    await refresh()
+    setActiveTab('queue')
+  }
+
+  const updateJobStatus = async (id: string, status: PrintJob['status']) => {
+    await db.updateJobStatus(id, status)
+    await refresh()
+  }
+
+  const removeJob = async (id: string) => {
+    await db.deleteJob(id)
+    await refresh()
+  }
+
+  /** Re-quote a finished job by copying it back into the queue. */
+  const repeatJob = async (id: string) => {
+    await db.duplicateJob(id)
+    await refresh()
+    setActiveTab('queue')
+  }
+
+  /**
+   * Erase a finished job from the work log. Confirmed explicitly because it
+   * destroys the only record of that job, and the repository refuses to do it
+   * without the force flag for exactly that reason.
+   */
+  const removeHistoryJob = async (id: string) => {
+    const entry = history.find(e => e.job.id === id)
+    const label = entry ? `#${String(entry.folio).padStart(4, '0')} ${entry.job.name}` : id
+    const ok = window.confirm(
+      `Borrar ${label} del historial?\n\n` +
+        'Se pierde el registro de ese trabajo: lo que cobraste, el material y la mano de obra. ' +
+        'No se puede deshacer.',
+    )
+    if (!ok) return
+    await db.deleteJob(id, true)
+    await refresh()
+  }
+
+  const addFilament = async (f: Omit<Filament, 'id'>) => {
+    await db.createFilament(f)
+    await refresh()
+  }
+
+  const removeFilament = async (id: string) => {
+    await db.deactivateFilament(id)
+    await refresh()
+  }
+
+  // Only work still in progress. Finished jobs are revenue already earned, not
+  // pipeline, and counting them here made the figure grow forever.
+  const totalRevenue = queue.reduce((sum, j) => sum + computeCosts(j).total, 0)
+
+  if (dbState.phase === 'opening') {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background)' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', letterSpacing: '0.15em' }}>
+          ABRIENDO BASE DE DATOS...
+        </div>
+      </div>
+    )
+  }
+
+  if (dbState.phase === 'failed') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8" style={{ background: 'var(--color-background)' }}>
+        <div style={{ maxWidth: 560, border: '1px solid var(--color-red)', background: 'var(--color-surface)', padding: 24 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--color-red)', letterSpacing: '0.1em', marginBottom: 12 }}>
+            NO SE PUDO ABRIR LA BASE DE DATOS
+          </div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: 16 }}>
+            {dbState.message}
+          </p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-dim)', lineHeight: 1.6 }}>
+            La causa más común es tener la app abierta en otra pestaña. SQLite permite una sola
+            conexión a la vez. Cierra las demás pestañas y recarga.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen" style={{ background: 'var(--color-background)', fontFamily: 'var(--font-sans)' }}>
+      {/* Header */}
+      <header className="app-header" style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12" style={{ flexShrink: 0, background: 'var(--color-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="square" strokeLinejoin="miter">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 'clamp(19px, 5.5vw, 24px)', color: 'var(--color-text)', letterSpacing: '-0.05em', lineHeight: 1 }}>
+                PRINTDESK
+              </div>
+              <div className="brand-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.15em', marginTop: 4, fontWeight: 700 }}>
+                PRICING // QUEUE // OPS
+              </div>
+            </div>
+          </div>
+
+          <div className="header-metrics">
+            <div className="text-right">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.1em', marginBottom: 4, fontWeight: 700 }}>
+                PIPELINE VALUE
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(16px, 4.5vw, 24px)', color: 'var(--color-orange)' }}>
+                {formatMXN(totalRevenue)}
+              </div>
+            </div>
+            <div className="hidden md:block" style={{ width: 1, height: 40, background: 'var(--color-border)' }} />
+            <div className="text-right">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.1em', marginBottom: 4, fontWeight: 700 }}>
+                ACTIVE RUNS
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(16px, 4.5vw, 24px)', color: 'var(--color-text)' }}>
+                {queue.length}
+              </div>
+            </div>
+            <div className="hidden md:block" style={{ width: 1, height: 40, background: 'var(--color-border)' }} />
+            <BackupControls onRestored={refresh} />
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 tab-bar" style={{ borderTop: '1px solid var(--color-border)' }}>
+          {(['calculator', 'queue', 'history', 'filaments'] as Tab[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="tab-btn"
+              data-active={activeTab === tab}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              {tab === 'calculator'
+                ? 'NEW JOB ESTIMATE'
+                : tab === 'queue'
+                  ? `QUEUE [${queue.length}]`
+                  : tab === 'history'
+                    ? `WORK HISTORY [${history.length}]`
+                    : 'FILAMENT INVENTORY'}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {activeTab === 'calculator' && <Calculator onAddToQueue={addToQueue} filaments={filaments} />}
+        {activeTab === 'queue' && <Queue jobs={queue} onUpdateStatus={updateJobStatus} onRemove={removeJob} />}
+        {activeTab === 'history' && <History entries={history} onDuplicate={repeatJob} onDelete={removeHistoryJob} />}
+        {activeTab === 'filaments' && <Filaments filaments={filaments} onAdd={addFilament} onRemove={removeFilament} />}
+      </main>
+    </div>
+  )
+}
+
+/**
+ * Export and restore the database file.
+ *
+ * Prominent by design. The database lives in the browser's private filesystem,
+ * which "clear site data" destroys without warning, so this file is the only
+ * backup that exists.
+ */
+function BackupControls({ onRestored }: { onRestored: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  const handleExport = async () => {
+    setBusy(true)
+    try {
+      const filename = await db.downloadBackup()
+      setNote(`Guardado: ${filename}`)
+    } catch (err) {
+      setNote(`Error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+
+    // Restoring replaces everything and cannot be undone, so it is confirmed
+    // explicitly rather than happening on file selection alone.
+    const ok = window.confirm(
+      `Reemplazar TODA la base de datos con "${file.name}"?\n\n` +
+        'Esto borra los trabajos, clientes y filamentos actuales. No se puede deshacer.',
+    )
+    if (!ok) return
+
+    setBusy(true)
+    try {
+      await db.restoreBackup(file)
+      await onRestored()
+      setNote('Base de datos restaurada')
+    } catch (err) {
+      setNote(`Error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="text-right">
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.1em', marginBottom: 6, fontWeight: 700 }}>
+        RESPALDO
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button
+          onClick={handleExport}
+          disabled={busy}
+          title="Descargar la base de datos como archivo .sqlite3"
+          style={backupButtonStyle}
+        >
+          EXPORTAR
+        </button>
+        <label style={{ ...backupButtonStyle, display: 'inline-block' }} title="Restaurar desde un archivo .sqlite3">
+          IMPORTAR
+          <input type="file" accept=".sqlite3,.sqlite,.db" onChange={handleRestore} disabled={busy} style={{ display: 'none' }} />
+        </label>
+      </div>
+      {note && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-text-dim)', marginTop: 4, maxWidth: 200 }}>
+          {note}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const backupButtonStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.05em',
+  color: 'var(--color-text)',
+  background: 'var(--color-surface-2)',
+  border: '1px solid var(--color-border)',
+  padding: '6px 10px',
+  cursor: 'pointer',
+}
