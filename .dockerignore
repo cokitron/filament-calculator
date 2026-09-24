@@ -1,0 +1,19 @@
+# Keeps the build context small and stops local artifacts leaking into the
+# image. node_modules is excluded so the image always installs from the
+# lockfile rather than inheriting a developer's partially-updated tree.
+node_modules
+dist
+build
+.cache
+.vite
+.git
+.gitignore
+# NOT .figma as a whole: vite.config.ts imports .figma/make/site.json for the
+# document title, description and lang, so the build fails without it. Only the
+# bulky design-context cache is excluded.
+.figma/design-context
+.plugins
+.opencode-skills
+*.log
+*.tsbuildinfo
+.env*

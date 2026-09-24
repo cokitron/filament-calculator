@@ -1,5 +1,7 @@
 {
+  "title": "PrintDesk — Cotizador y cola de impresión 3D",
   "description": "Streamline 3D print pricing and queue management with customizable cost inputs, margins, and labor tracking for accurate, efficient business operations.",
+  "language": "es-MX",
   "robots": {
     "index": false
   },

@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "vite build && node scripts/e2e-check.mjs",
     "test:responsive": "vite build && node scripts/responsive-check.mjs",
+    "check:deploy": "node scripts/deploy-check.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
