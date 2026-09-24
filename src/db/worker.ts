@@ -1,5 +1,9 @@
 /// <reference lib="webworker" />
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
+// Vite inlines the schema as a string at build time. The schema module itself
+// takes the SQL as an argument so that it also loads under Node, where the
+// server reads the same file from disk.
+import schemaSql from './schema.sql?raw'
 import { SqlExecutor, SqlParam } from './types'
 import { initializeSchema, ensureSettings, SCHEMA_VERSION } from './schema'
 import * as repo from './repository'
@@ -119,7 +123,7 @@ async function open(): Promise<{ persistent: boolean; schema: { from: number; to
   }
 
   executor = makeExecutor(rawDb)
-  const schema = initializeSchema(executor)
+  const schema = initializeSchema(executor, schemaSql)
   ensureSettings(executor)
   return { persistent, schema }
 }
@@ -160,7 +164,7 @@ async function importDatabase(bytes: Uint8Array): Promise<void> {
   rawDb = new poolUtil.OpfsSAHPoolDb(`/${DB_FILENAME}`)
   executor = makeExecutor(rawDb)
   // The imported file may predate this build, so run migrations over it.
-  initializeSchema(executor)
+  initializeSchema(executor, schemaSql)
   ensureSettings(executor)
 }
 

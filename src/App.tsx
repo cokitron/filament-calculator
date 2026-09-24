@@ -3,6 +3,7 @@ import Calculator from './components/Calculator'
 import Queue from './components/Queue'
 import History from './components/History'
 import Filaments from './components/Filaments'
+import Login from './components/Login'
 import { PrintJob, Filament } from './types'
 import { computeCosts, formatMXN } from './pricing'
 import * as db from './db/client'
@@ -12,6 +13,7 @@ type Tab = 'calculator' | 'queue' | 'history' | 'filaments'
 
 type DbState =
   | { phase: 'opening' }
+  | { phase: 'locked' }
   | { phase: 'ready' }
   | { phase: 'failed'; message: string }
 
@@ -35,49 +37,99 @@ export default function App() {
     setFilaments(fils)
   }, [])
 
+  /** Open storage and load everything. Assumes any required session exists. */
+  const start = useCallback(async () => {
+    await db.openDatabase()
+    // Lift anything the old localStorage version saved. Runs at most once; the
+    // database records that it happened. No-op in remote mode.
+    await db.importLegacyIfNeeded()
+    await refresh()
+    setDbState({ phase: 'ready' })
+  }, [refresh])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        await db.openDatabase()
-        // Lift anything the old localStorage version saved. Runs at most once;
-        // the database records that it happened.
-        await db.importLegacyIfNeeded()
+        // In remote mode the password gate comes before any data call, so an
+        // unauthenticated visitor never sees an empty app that silently fails.
+        const session = await db.getSession()
         if (cancelled) return
-        await refresh()
-        if (!cancelled) setDbState({ phase: 'ready' })
-      } catch (err) {
-        if (!cancelled) {
-          setDbState({ phase: 'failed', message: err instanceof Error ? err.message : String(err) })
+        if (!session.authenticated) {
+          setDbState({ phase: 'locked' })
+          return
         }
+        await start()
+      } catch (err) {
+        if (cancelled) return
+        if (db.isUnauthorized(err)) setDbState({ phase: 'locked' })
+        else setDbState({ phase: 'failed', message: err instanceof Error ? err.message : String(err) })
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [refresh])
+  }, [start])
+
+  const handleLogin = async (password: string) => {
+    await db.login(password)
+    setDbState({ phase: 'opening' })
+    await start()
+  }
+
+  const handleLogout = async () => {
+    await db.logout()
+    setQueue([])
+    setHistory([])
+    setFilaments([])
+    setDbState({ phase: 'locked' })
+  }
+
+  /**
+   * Run a data mutation, sending the user back to the login screen if the
+   * session has expired rather than surfacing a confusing storage error.
+   */
+  const guard = useCallback(async (action: () => Promise<void>) => {
+    try {
+      await action()
+    } catch (err) {
+      if (db.isUnauthorized(err)) {
+        setDbState({ phase: 'locked' })
+        return
+      }
+      throw err
+    }
+  }, [])
 
   const addToQueue = async (job: PrintJob) => {
-    await db.saveJob(job)
-    await refresh()
-    setActiveTab('queue')
+    await guard(async () => {
+      await db.saveJob(job)
+      await refresh()
+      setActiveTab('queue')
+    })
   }
 
   const updateJobStatus = async (id: string, status: PrintJob['status']) => {
-    await db.updateJobStatus(id, status)
-    await refresh()
+    await guard(async () => {
+      await db.updateJobStatus(id, status)
+      await refresh()
+    })
   }
 
   const removeJob = async (id: string) => {
-    await db.deleteJob(id)
-    await refresh()
+    await guard(async () => {
+      await db.deleteJob(id)
+      await refresh()
+    })
   }
 
   /** Re-quote a finished job by copying it back into the queue. */
   const repeatJob = async (id: string) => {
-    await db.duplicateJob(id)
-    await refresh()
-    setActiveTab('queue')
+    await guard(async () => {
+      await db.duplicateJob(id)
+      await refresh()
+      setActiveTab('queue')
+    })
   }
 
   /**
@@ -94,23 +146,33 @@ export default function App() {
         'No se puede deshacer.',
     )
     if (!ok) return
-    await db.deleteJob(id, true)
-    await refresh()
+    await guard(async () => {
+      await db.deleteJob(id, true)
+      await refresh()
+    })
   }
 
   const addFilament = async (f: Omit<Filament, 'id'>) => {
-    await db.createFilament(f)
-    await refresh()
+    await guard(async () => {
+      await db.createFilament(f)
+      await refresh()
+    })
   }
 
   const removeFilament = async (id: string) => {
-    await db.deactivateFilament(id)
-    await refresh()
+    await guard(async () => {
+      await db.deactivateFilament(id)
+      await refresh()
+    })
   }
 
   // Only work still in progress. Finished jobs are revenue already earned, not
   // pipeline, and counting them here made the figure grow forever.
   const totalRevenue = queue.reduce((sum, j) => sum + computeCosts(j).total, 0)
+
+  if (dbState.phase === 'locked') {
+    return <Login onSubmit={handleLogin} />
+  }
 
   if (dbState.phase === 'opening') {
     return (
@@ -183,7 +245,7 @@ export default function App() {
               </div>
             </div>
             <div className="hidden md:block" style={{ width: 1, height: 40, background: 'var(--color-border)' }} />
-            <BackupControls onRestored={refresh} />
+            <BackupControls onRestored={refresh} onLogout={handleLogout} />
           </div>
         </div>
 
@@ -226,15 +288,26 @@ export default function App() {
 }
 
 /**
- * Export and restore the database file.
+ * Export and restore the database file, and show where that database lives.
  *
- * Prominent by design. The database lives in the browser's private filesystem,
- * which "clear site data" destroys without warning, so this file is the only
- * backup that exists.
+ * Prominent by design. In local mode the database sits in the browser's private
+ * filesystem, which "clear site data" destroys without warning, so this file is
+ * the only backup that exists. In remote mode the volume holds the data, but
+ * this is still the only copy that is off that volume.
+ *
+ * The storage label is not decoration: knowing whether you are looking at shared
+ * data or this device's own copy changes what the numbers mean.
  */
-function BackupControls({ onRestored }: { onRestored: () => Promise<void> }) {
+function BackupControls({
+  onRestored,
+  onLogout,
+}: {
+  onRestored: () => Promise<void>
+  onLogout: () => Promise<void>
+}) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  const remote = db.STORAGE_MODE === 'remote'
 
   const handleExport = async () => {
     setBusy(true)
@@ -257,7 +330,10 @@ function BackupControls({ onRestored }: { onRestored: () => Promise<void> }) {
     // explicitly rather than happening on file selection alone.
     const ok = window.confirm(
       `Reemplazar TODA la base de datos con "${file.name}"?\n\n` +
-        'Esto borra los trabajos, clientes y filamentos actuales. No se puede deshacer.',
+        (remote
+          ? 'Esto borra los datos del servidor para todos los dispositivos. '
+          : 'Esto borra los trabajos, clientes y filamentos actuales. ') +
+        'No se puede deshacer.',
     )
     if (!ok) return
 
@@ -275,8 +351,22 @@ function BackupControls({ onRestored }: { onRestored: () => Promise<void> }) {
 
   return (
     <div className="text-right">
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.1em', marginBottom: 6, fontWeight: 700 }}>
-        RESPALDO
+      <div
+        title={
+          remote
+            ? 'Los datos viven en el servidor y se comparten entre dispositivos.'
+            : 'Los datos viven solo en este navegador. Otro dispositivo no los ve.'
+        }
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: remote ? 'var(--color-green)' : 'var(--color-text-muted)',
+          letterSpacing: '0.1em',
+          marginBottom: 6,
+          fontWeight: 700,
+        }}
+      >
+        {remote ? 'SERVIDOR' : 'ESTE EQUIPO'}
       </div>
       <div className="flex gap-2 justify-end">
         <button
@@ -291,6 +381,11 @@ function BackupControls({ onRestored }: { onRestored: () => Promise<void> }) {
           IMPORTAR
           <input type="file" accept=".sqlite3,.sqlite,.db" onChange={handleRestore} disabled={busy} style={{ display: 'none' }} />
         </label>
+        {remote && (
+          <button onClick={onLogout} disabled={busy} title="Cerrar sesión" style={backupButtonStyle}>
+            SALIR
+          </button>
+        )}
       </div>
       {note && (
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-text-dim)', marginTop: 4, maxWidth: 200 }}>

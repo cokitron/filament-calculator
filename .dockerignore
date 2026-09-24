@@ -3,6 +3,7 @@
 # lockfile rather than inheriting a developer's partially-updated tree.
 node_modules
 dist
+dist-server
 build
 .cache
 .vite

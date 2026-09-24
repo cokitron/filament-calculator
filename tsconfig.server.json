@@ -1,0 +1,35 @@
+{
+  // Compiles the server and the data layer it shares with the frontend.
+  //
+  // CommonJS, not ESM: the source uses extensionless relative imports
+  // ("./types"), which Node's ESM resolver rejects and tsc does not rewrite.
+  // CommonJS resolves them natively, so no bundler is needed in the image.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "types": ["node"],
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": [
+    "server/**/*.ts",
+    // Shared data layer. Deliberately NOT worker.ts, client.ts or
+    // importLegacy.ts: those are browser-only (Worker globals, localStorage,
+    // Vite's ?raw import) and would fail to compile without DOM types.
+    "src/db/types.ts",
+    "src/db/schema.ts",
+    "src/db/repository.ts",
+    "src/db/nodeExecutor.ts",
+    "src/pricing.ts",
+    "src/types.ts"
+  ],
+  "exclude": ["**/*.test.ts"]
+}

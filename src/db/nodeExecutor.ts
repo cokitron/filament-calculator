@@ -2,12 +2,16 @@ import { DatabaseSync } from 'node:sqlite'
 import { SqlExecutor, SqlParam } from './types'
 
 /**
- * SqlExecutor backed by Node's built-in SQLite, used only by the test suite.
+ * SqlExecutor backed by Node's built-in SQLite.
  *
- * This exists so the schema and every repository query are exercised against a
- * real SQLite engine — the same engine family the browser runs via WASM —
- * without needing a browser, a Worker, or OPFS. If a CHECK constraint or a
- * query is wrong, the tests catch it here rather than at runtime in the app.
+ * Used by two callers: the test suite, which exercises the schema and every
+ * repository query against a real SQLite engine without needing a browser, a
+ * Worker or OPFS; and the server (server/db.ts), which runs the very same
+ * repository code against a database file on disk.
+ *
+ * That the app, the tests and the server all go through one SqlExecutor
+ * interface is what makes server-side storage a thin addition rather than a
+ * second implementation of the data layer.
  */
 export class NodeSqlExecutor implements SqlExecutor {
   private db: DatabaseSync

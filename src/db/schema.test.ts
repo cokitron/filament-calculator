@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { NodeSqlExecutor } from './testExecutor'
+import schemaSql from './schema.sql?raw'
+import { NodeSqlExecutor } from './nodeExecutor'
 import { initializeSchema, readVersion, ensureSettings, SCHEMA_VERSION } from './schema'
 
 let db: NodeSqlExecutor
 
 beforeEach(() => {
   db = new NodeSqlExecutor()
-  initializeSchema(db)
+  initializeSchema(db, schemaSql)
   ensureSettings(db)
 })
 
@@ -36,7 +37,7 @@ describe('schema initialisation', () => {
   })
 
   it('is idempotent — re-running does not fail or duplicate', () => {
-    const result = initializeSchema(db)
+    const result = initializeSchema(db, schemaSql)
     expect(result.to).toBe(SCHEMA_VERSION)
     const rows = db.all('select version from schema_version')
     expect(rows.length).toBe(1)
@@ -44,7 +45,7 @@ describe('schema initialisation', () => {
 
   it('refuses to open a database written by a newer app version', () => {
     db.run('insert into schema_version (version, applied_at) values (?, ?)', [99, 'x'])
-    expect(() => initializeSchema(db)).toThrow(/newer than this app supports/)
+    expect(() => initializeSchema(db, schemaSql)).toThrow(/newer than this app supports/)
   })
 
   it('creates every expected table', () => {

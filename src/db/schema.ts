@@ -1,4 +1,3 @@
-import schemaSql from './schema.sql?raw'
 import { SqlExecutor, nowIso } from './types'
 
 /**
@@ -25,8 +24,14 @@ const MIGRATIONS: Record<number, (db: SqlExecutor) => void> = {
  *
  * Safe to call on every startup: the schema uses CREATE ... IF NOT EXISTS
  * throughout, and already-applied migrations are skipped.
+ *
+ * `schemaSql` is passed in rather than imported because this module runs in two
+ * environments with different ways of reading a file: the browser bundle gets
+ * it through Vite's `?raw`, while the Node server reads it from disk with `fs`.
+ * Importing it directly would tie this module to a bundler feature and make it
+ * unloadable server-side.
  */
-export function initializeSchema(db: SqlExecutor): { from: number; to: number } {
+export function initializeSchema(db: SqlExecutor, schemaSql: string): { from: number; to: number } {
   applyPragmas(db)
 
   const before = readVersion(db)

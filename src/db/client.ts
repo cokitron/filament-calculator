@@ -1,68 +1,69 @@
 import { PrintJob, Filament } from '../types'
 import type { Settings, Customer, FrozenTotals, JobHistoryEntry } from './repository'
+import { callLocal } from './localTransport'
+import {
+  callRemote,
+  fetchSession,
+  loginRemote,
+  logoutRemote,
+  downloadBackupRemote,
+  restoreBackupRemote,
+  UnauthorizedError,
+} from './remoteTransport'
 
 export type { JobHistoryEntry } from './repository'
+export { UnauthorizedError } from './remoteTransport'
 
 /**
- * Main-thread API for the database.
+ * The app's database API.
  *
- * The Worker owns the only SQLite connection; this is a typed promise wrapper
- * over the message channel to it. Components never talk to the Worker directly.
+ * There are two places the data can live, and exactly one of them is active:
+ *
+ *   local   SQLite in this browser, in OPFS, reached through a Worker. Offline,
+ *           private, and per-device — two devices never see the same data.
+ *   remote  SQLite on the server, on a persistent volume, behind a shared
+ *           password. Shared across devices, and requires the network.
+ *
+ * The mode is a build-time decision (VITE_STORAGE_MODE), not runtime detection.
+ * Guessing would risk writing a day's quotes into the wrong database, and the
+ * static build — including the Figma Make preview, which has no server — must
+ * keep working on OPFS.
+ *
+ * Every function below has the same signature in both modes, so components never
+ * know which is in use.
  */
 
-type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void }
+export type StorageMode = 'local' | 'remote'
 
-let worker: Worker | null = null
-let nextId = 1
-const pending = new Map<number, Pending>()
-let openPromise: Promise<OpenResult> | null = null
+export const STORAGE_MODE: StorageMode =
+  import.meta.env.VITE_STORAGE_MODE === 'remote' ? 'remote' : 'local'
+
+const isRemote = STORAGE_MODE === 'remote'
+
+/** Route one op to whichever transport is active. */
+const call = <T>(payload: Record<string, unknown>): Promise<T> =>
+  isRemote ? callRemote<T>(payload) : callLocal<T>(payload)
 
 export interface OpenResult {
   persistent: boolean
   schema: { from: number; to: number }
 }
 
-function ensureWorker(): Worker {
-  if (worker) return worker
-
-  worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-
-  worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; result?: unknown; error?: string }>) => {
-    const { id, ok, result, error } = event.data
-    const entry = pending.get(id)
-    if (!entry) return
-    pending.delete(id)
-    if (ok) entry.resolve(result)
-    else entry.reject(new Error(error ?? 'unknown database error'))
-  }
-
-  worker.onerror = event => {
-    // A worker-level failure (module load, WASM fetch) never resolves individual
-    // requests, so fail everything in flight rather than hanging the UI forever.
-    const err = new Error(`Database worker failed: ${event.message}`)
-    for (const [, entry] of pending) entry.reject(err)
-    pending.clear()
-  }
-
-  return worker
-}
-
-function call<T>(payload: Record<string, unknown>): Promise<T> {
-  const w = ensureWorker()
-  const id = nextId++
-  return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (v: unknown) => void, reject })
-    w.postMessage({ id, ...payload })
-  })
-}
+let openPromise: Promise<OpenResult> | null = null
 
 /**
- * Open the database and run migrations. Safe to call repeatedly: the work
- * happens once and every caller awaits the same promise.
+ * Prepare storage. Safe to call repeatedly: the work happens once and every
+ * caller awaits the same promise.
+ *
+ * In remote mode there is nothing to open — the server did it at boot — but the
+ * call is kept so the startup path is identical in both modes.
  */
 export function openDatabase(): Promise<OpenResult> {
+  if (isRemote) {
+    return Promise.resolve({ persistent: true, schema: { from: 1, to: 1 } })
+  }
   if (!openPromise) {
-    openPromise = call<OpenResult>({ op: 'open' }).catch(err => {
+    openPromise = callLocal<OpenResult>({ op: 'open' }).catch(err => {
       // Clear the cache so a later retry can genuinely re-attempt rather than
       // replaying the failure forever.
       openPromise = null
@@ -70,6 +71,27 @@ export function openDatabase(): Promise<OpenResult> {
     })
   }
   return openPromise
+}
+
+// --- Authentication ---------------------------------------------------------
+//
+// Local mode has no concept of a session: the data is already on the device and
+// the browser profile is the only thing guarding it. These resolve accordingly
+// so App.tsx does not need a branch for every call.
+
+export async function getSession(): Promise<{ authenticated: boolean }> {
+  if (!isRemote) return { authenticated: true }
+  return fetchSession()
+}
+
+export async function login(password: string): Promise<void> {
+  if (!isRemote) return
+  return loginRemote(password)
+}
+
+export async function logout(): Promise<void> {
+  if (!isRemote) return
+  return logoutRemote()
 }
 
 // --- Jobs -------------------------------------------------------------------
@@ -113,27 +135,6 @@ export const updateSettings = (patch: Partial<Settings>) =>
 
 // --- Legacy localStorage migration -----------------------------------------
 
-/**
- * Move any data the old localStorage version saved into SQLite.
- *
- * localStorage is not available inside a Worker, so the main thread reads it and
- * ships the parsed contents across. The Worker records that the import ran, so
- * this is safe to call on every startup and cannot duplicate the queue.
- *
- * The localStorage keys are intentionally left in place: if the import produced
- * something unexpected, the original data is still recoverable.
- */
-export async function importLegacyIfNeeded(): Promise<ImportSummary> {
-  const { readLegacyLocalStorage } = await import('./importLegacy')
-  const legacy = readLegacyLocalStorage(window.localStorage)
-
-  if (legacy.filaments.length === 0 && legacy.jobs.length === 0) {
-    return { alreadyDone: true, filamentsImported: 0, jobsImported: 0, skipped: [] }
-  }
-
-  return call<ImportSummary>({ op: 'importLegacy', legacy })
-}
-
 export interface ImportSummary {
   alreadyDone: boolean
   filamentsImported: number
@@ -141,16 +142,42 @@ export interface ImportSummary {
   skipped: { job: string; reason: string }[]
 }
 
+/**
+ * Move any data the old localStorage version saved into SQLite.
+ *
+ * Local mode only. localStorage is per-browser, so importing it into a shared
+ * server database would copy one device's history into everyone's view; in
+ * remote mode the migration path is Export here, then Import there.
+ */
+export async function importLegacyIfNeeded(): Promise<ImportSummary> {
+  const nothingToDo: ImportSummary = {
+    alreadyDone: true,
+    filamentsImported: 0,
+    jobsImported: 0,
+    skipped: [],
+  }
+  if (isRemote) return nothingToDo
+
+  const { readLegacyLocalStorage } = await import('./importLegacy')
+  const legacy = readLegacyLocalStorage(window.localStorage)
+  if (legacy.filaments.length === 0 && legacy.jobs.length === 0) return nothingToDo
+
+  return callLocal<ImportSummary>({ op: 'importLegacy', legacy })
+}
+
 // --- Backup -----------------------------------------------------------------
 
 /**
  * Download the database as a .sqlite3 file.
  *
- * This matters more here than it would with a server database: OPFS is wiped
- * when the browser clears site data, and this file is the only way back.
+ * In local mode this is the only copy that exists anywhere: OPFS is wiped when
+ * the browser clears site data. In remote mode the volume holds the data, but
+ * this is still the only backup off that volume.
  */
 export async function downloadBackup(): Promise<string> {
-  const bytes = await call<Uint8Array>({ op: 'export' })
+  if (isRemote) return downloadBackupRemote()
+
+  const bytes = await callLocal<Uint8Array>({ op: 'export' })
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
   const filename = `printdesk-${stamp}.sqlite3`
 
@@ -176,6 +203,10 @@ export async function downloadBackup(): Promise<string> {
  * Destructive and irreversible — the caller must confirm with the user first.
  */
 export async function restoreBackup(file: File): Promise<void> {
+  if (isRemote) return restoreBackupRemote(file)
   const bytes = new Uint8Array(await file.arrayBuffer())
-  await call<void>({ op: 'import', bytes })
+  await callLocal<void>({ op: 'import', bytes })
 }
+
+/** True when a failure means "log in again" rather than "storage is broken". */
+export const isUnauthorized = (err: unknown): boolean => err instanceof UnauthorizedError

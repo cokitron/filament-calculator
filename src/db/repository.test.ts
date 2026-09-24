@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { NodeSqlExecutor } from './testExecutor'
+import schemaSql from './schema.sql?raw'
+import { NodeSqlExecutor } from './nodeExecutor'
 import { initializeSchema, ensureSettings } from './schema'
 import {
   getSettings, updateSettings,
@@ -15,7 +16,7 @@ let db: NodeSqlExecutor
 
 beforeEach(() => {
   db = new NodeSqlExecutor()
-  initializeSchema(db)
+  initializeSchema(db, schemaSql)
   ensureSettings(db)
 })
 

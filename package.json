@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start:server": "node dist-server/server/main.js",
     "preview": "vite preview",
     "format": "oxfmt",
     "test": "vitest run",
