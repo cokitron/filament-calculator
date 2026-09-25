@@ -1,0 +1,276 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Add schema migration and fresh-DB columns for `minimum_order` and `machine_rate`": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554121
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355576590
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356278391
+      }
+    ],
+    "2.1 Write schema tests for migration and seeding": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554179
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356733674
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356895187
+      }
+    ],
+    "3. Add `Printer`/`PrinterStatus` types and extend `PrintJob`/`Settings` types": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554249
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355576549
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356278337
+      }
+    ],
+    "4. Implement printer CRUD functions in the repository layer": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554327
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356289851
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356711730
+      }
+    ],
+    "5.1 Write repository tests for printer CRUD, settings, and job snapshot round-trip": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554372
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356733632
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356895251
+      }
+    ],
+    "6. Checkpoint - Ensure all repository and schema tests pass": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554421
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357215636
+      }
+    ],
+    "7.1 Write property and unit tests for the pricing engine changes in `src/pricing.test.ts`": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554463
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356909993
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357184558
+      }
+    ],
+    "8. Checkpoint - Ensure all pricing tests pass": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554502
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357215561
+      }
+    ],
+    "9. Add matching `op` cases for printer CRUD in `src/db/worker.ts` and `server/api.ts`": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554542
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356733598
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356895319
+      }
+    ],
+    "10. Add `client.ts` wrapper exports for printer CRUD": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554579
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356733717
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356895354
+      }
+    ],
+    "11. Checkpoint - Ensure all tests pass and both transports expose identical ops": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554617
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357215672
+      }
+    ],
+    "12. Build `ShopSettings.tsx` component": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554660
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357222159
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357385846
+      }
+    ],
+    "13. Wire printer selection and snapshot-on-save into `Calculator.tsx`": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554710
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357222240
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357385890
+      }
+    ],
+    "14. Wire the new 'settings' tab, printers/settings state, and `computeCosts` call sites in `App.tsx`": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554747
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357391536
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357575511
+      }
+    ],
+    "15. Final checkpoint - Full-suite regression run": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790355554782
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357579911
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357594190
+      }
+    ],
+    "2. Add `ensureDefaultPrinter` seed function and wire it into both DB open paths": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356289809
+      }
+    ],
+    "7. Implement `machineRate()` and extend `CostBreakdown`/`computeCosts` in the pricing engine": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356733506
+      }
+    ],
+    "5. Extend settings get/update and job save/read for the new fields": [
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356895442
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790356910043
+      },
+      {
+        "executionId": "c8314418-e6d6-49b5-bd06-12d04b3c0524",
+        "chatSessionId": "sess_dac85456-315e-4752-a0f4-ea751a6ed66b",
+        "timestamp": 1790357184521
+      }
+    ]
+  }
+}

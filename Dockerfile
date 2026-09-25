@@ -51,13 +51,16 @@ ENV STATIC_DIR=/app/public
 # ephemeral and every redeploy would silently start from an empty database.
 ENV DATABASE_PATH=/data/printdesk.sqlite3
 
-# Drop privileges: the server only ever needs to read the bundle and read/write
-# the database file.
+# Ownership here covers the image itself; the mounted volume is handled at
+# startup by the entrypoint, because Railway mounts it after build.
 RUN mkdir -p /data && chown -R node:node /data /app
-USER node
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8080
 
-# No shell form, so the process is PID 1 and receives Railway's SIGTERM directly
-# — which is what lets it close SQLite cleanly and checkpoint the WAL.
+# Stays root only long enough to take ownership of the mounted volume, which
+# Railway mounts as root after build; the entrypoint then becomes `node`.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist-server/server/main.js"]

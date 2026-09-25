@@ -6,11 +6,16 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
-} from 'node:fs'
-import { dirname, join } from 'node:path'
-import { NodeSqlExecutor } from '../src/db/nodeExecutor'
-import { initializeSchema, ensureSettings, applyPragmas } from '../src/db/schema'
-import type { SqlExecutor } from '../src/db/types'
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { NodeSqlExecutor } from "../src/db/nodeExecutor";
+import {
+  initializeSchema,
+  ensureSettings,
+  ensureDefaultPrinter,
+  applyPragmas,
+} from "../src/db/schema";
+import type { SqlExecutor } from "../src/db/types";
 
 /**
  * The server's single SQLite connection.
@@ -21,10 +26,10 @@ import type { SqlExecutor } from '../src/db/types'
  */
 
 export interface ServerDatabase {
-  executor: SqlExecutor
-  path: string
-  schema: { from: number; to: number }
-  close(): void
+  executor: SqlExecutor;
+  path: string;
+  schema: { from: number; to: number };
+  close(): void;
 }
 
 /**
@@ -38,45 +43,49 @@ export interface ServerDatabase {
 function readSchemaSql(): string {
   const candidates = [
     ...(process.env.SCHEMA_SQL_PATH ? [process.env.SCHEMA_SQL_PATH] : []),
-    join(process.cwd(), 'src', 'db', 'schema.sql'),
-    join(process.cwd(), 'dist-server', 'src', 'db', 'schema.sql'),
-  ]
+    join(process.cwd(), "src", "db", "schema.sql"),
+    join(process.cwd(), "dist-server", "src", "db", "schema.sql"),
+  ];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return readFileSync(candidate, 'utf8')
+    if (existsSync(candidate)) return readFileSync(candidate, "utf8");
   }
   throw new Error(
-    `Could not find schema.sql. Looked in:\n  ${candidates.join('\n  ')}\n` +
-      'Set SCHEMA_SQL_PATH, or run with the repository root as the working directory.',
-  )
+    `Could not find schema.sql. Looked in:\n  ${candidates.join("\n  ")}\n` +
+      "Set SCHEMA_SQL_PATH, or run with the repository root as the working directory.",
+  );
 }
 
-export function openDatabase(databasePath: string, schemaSql = readSchemaSql()): ServerDatabase {
+export function openDatabase(
+  databasePath: string,
+  schemaSql = readSchemaSql(),
+): ServerDatabase {
   // Railway mounts the volume before the process starts, but the subdirectory
   // may not exist yet on a first deploy.
-  mkdirSync(dirname(databasePath), { recursive: true })
+  mkdirSync(dirname(databasePath), { recursive: true });
 
-  const executor = new NodeSqlExecutor(databasePath)
+  const executor = new NodeSqlExecutor(databasePath);
 
   // WAL matters here in a way it does not in the browser: a reader no longer
   // blocks the writer, so a long report query cannot stall a save. It also
   // survives an abrupt container stop better than the rollback journal, which is
   // exactly what a redeploy is.
-  executor.exec('pragma journal_mode = WAL')
+  executor.exec("pragma journal_mode = WAL");
   // FULL would fsync on every commit; NORMAL loses at most the last commit on a
   // hard crash and is the usual choice for WAL. The volume is persistent, so the
   // realistic failure is a redeploy between commits, not disk loss.
-  executor.exec('pragma synchronous = NORMAL')
-  applyPragmas(executor)
+  executor.exec("pragma synchronous = NORMAL");
+  applyPragmas(executor);
 
-  const schema = initializeSchema(executor, readSchemaSql())
-  ensureSettings(executor)
+  const schema = initializeSchema(executor, readSchemaSql());
+  ensureSettings(executor);
+  ensureDefaultPrinter(executor);
 
   return {
     executor,
     path: databasePath,
     schema,
     close: () => executor.close(),
-  }
+  };
 }
 
 /**
@@ -88,14 +97,14 @@ export function openDatabase(databasePath: string, schemaSql = readSchemaSql()):
  * fully checkpointed database.
  */
 export function exportDatabase(db: ServerDatabase): Buffer {
-  const target = `${db.path}.export-${process.pid}-${Date.now()}`
-  db.executor.run('vacuum into ?', [target])
+  const target = `${db.path}.export-${process.pid}-${Date.now()}`;
+  db.executor.run("vacuum into ?", [target]);
   try {
-    return readFileSync(target)
+    return readFileSync(target);
   } finally {
     try {
       // Best effort: a leftover export file is harmless but wastes volume space.
-      unlinkSync(target)
+      unlinkSync(target);
     } catch {
       /* ignore */
     }
@@ -114,31 +123,31 @@ export function importDatabase(
   bytes: Buffer,
   reopen: (path: string) => ServerDatabase,
 ): ServerDatabase {
-  const header = bytes.subarray(0, 15).toString('utf8')
-  if (!header.startsWith('SQLite format 3')) {
-    throw new Error('That file is not a SQLite database.')
+  const header = bytes.subarray(0, 15).toString("utf8");
+  if (!header.startsWith("SQLite format 3")) {
+    throw new Error("That file is not a SQLite database.");
   }
 
-  const path = db.path
-  db.close()
+  const path = db.path;
+  db.close();
 
-  if (existsSync(path)) copyFileSync(path, `${path}.pre-restore`)
+  if (existsSync(path)) copyFileSync(path, `${path}.pre-restore`);
 
   // Write to a temporary file and rename, so an interrupted write cannot leave a
   // half-copied database in place of the real one.
-  const staging = `${path}.incoming`
-  writeFileSync(staging, bytes)
-  renameSync(staging, path)
+  const staging = `${path}.incoming`;
+  writeFileSync(staging, bytes);
+  renameSync(staging, path);
 
   // The WAL and shared-memory files belong to the replaced database; leaving
   // them would make SQLite try to recover them against the new file.
-  for (const suffix of ['-wal', '-shm']) {
+  for (const suffix of ["-wal", "-shm"]) {
     try {
-      unlinkSync(`${path}${suffix}`)
+      unlinkSync(`${path}${suffix}`);
     } catch {
       /* not present, fine */
     }
   }
 
-  return reopen(path)
+  return reopen(path);
 }

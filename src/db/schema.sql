@@ -52,6 +52,7 @@ create table if not exists settings (
   default_iva_enabled     integer not null default 0,
   iva_rate                real    not null default 0.16,   -- 16%; 8% border zone
   failure_rate_percent    real    not null default 0.0,
+  minimum_order           real    not null default 0.0,    -- MXN floor on a job's total price
   quote_validity_days     integer not null default 15,
 
   created_at              text    not null,
@@ -248,6 +249,7 @@ create table if not exists jobs (
   -- Snapshotted from the printer so retiring or reassigning a machine does not
   -- change what an already-quoted job cost to run.
   power_watts      real    not null default 200.0,
+  machine_rate     real    not null default 0.0,           -- MXN/hour, snapshotted from the printer
 
   packaging_cost   real    not null default 0.0,          -- MXN per unit
   finishing_cost   real    not null default 0.0,          -- MXN per unit

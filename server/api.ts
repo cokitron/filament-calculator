@@ -1,6 +1,6 @@
-import * as repo from '../src/db/repository'
-import type { SqlExecutor } from '../src/db/types'
-import type { PrintJob, Filament } from '../src/types'
+import * as repo from "../src/db/repository";
+import type { SqlExecutor } from "../src/db/types";
+import type { PrintJob, Filament, Printer, PrinterStatus } from "../src/types";
 
 /**
  * The data API.
@@ -15,21 +15,21 @@ import type { PrintJob, Filament } from '../src/types'
  * addition instead of a parallel implementation.
  */
 
-export type RpcRequest = { op: string } & Record<string, unknown>
+export type RpcRequest = { op: string } & Record<string, unknown>;
 
 /** Ops that only read, used to reject writes on a read-only request path. */
 const READ_OPS = new Set([
-  'listJobs',
-  'listActiveJobs',
-  'listJobHistory',
-  'getQuoteTotals',
-  'listFilaments',
-  'listCustomers',
-  'getSettings',
-])
+  "listJobs",
+  "listActiveJobs",
+  "listJobHistory",
+  "getQuoteTotals",
+  "listFilaments",
+  "listCustomers",
+  "getSettings",
+]);
 
 export function isReadOp(op: string): boolean {
-  return READ_OPS.has(op)
+  return READ_OPS.has(op);
 }
 
 export class UnknownOpError extends Error {}
@@ -37,44 +37,79 @@ export class UnknownOpError extends Error {}
 export function handleRpc(db: SqlExecutor, msg: RpcRequest): unknown {
   switch (msg.op) {
     // --- Jobs ---------------------------------------------------------------
-    case 'listJobs':
-      return repo.listJobs(db)
-    case 'listActiveJobs':
-      return repo.listActiveJobs(db)
-    case 'listJobHistory':
-      return repo.listJobHistory(db)
-    case 'saveJob':
-      return repo.saveJob(db, msg.job as PrintJob)
-    case 'updateJobStatus':
-      return repo.updateJobStatus(db, msg.jobId as string, msg.status as PrintJob['status'])
-    case 'deleteJob':
-      return repo.deleteJob(db, msg.jobId as string, { force: msg.force === true })
-    case 'duplicateJob':
-      return repo.duplicateJob(db, msg.jobId as string, msg.name as string | undefined)
-    case 'issueQuote':
-      return repo.issueQuote(db, msg.jobId as string, msg.status as 'sent' | 'accepted' | 'rejected')
-    case 'getQuoteTotals':
-      return repo.getQuoteTotals(db, msg.jobId as string)
+    case "listJobs":
+      return repo.listJobs(db);
+    case "listActiveJobs":
+      return repo.listActiveJobs(db);
+    case "listJobHistory":
+      return repo.listJobHistory(db);
+    case "saveJob":
+      return repo.saveJob(db, msg.job as PrintJob);
+    case "updateJobStatus":
+      return repo.updateJobStatus(
+        db,
+        msg.jobId as string,
+        msg.status as PrintJob["status"],
+      );
+    case "deleteJob":
+      return repo.deleteJob(db, msg.jobId as string, {
+        force: msg.force === true,
+      });
+    case "duplicateJob":
+      return repo.duplicateJob(
+        db,
+        msg.jobId as string,
+        msg.name as string | undefined,
+      );
+    case "issueQuote":
+      return repo.issueQuote(
+        db,
+        msg.jobId as string,
+        msg.status as "sent" | "accepted" | "rejected",
+      );
+    case "getQuoteTotals":
+      return repo.getQuoteTotals(db, msg.jobId as string);
 
     // --- Filaments and customers -------------------------------------------
-    case 'listFilaments':
-      return repo.listFilaments(db)
-    case 'createFilament':
-      return repo.createFilament(db, msg.filament as Omit<Filament, 'id'>)
-    case 'deactivateFilament':
-      return repo.deactivateFilament(db, msg.filamentId as string)
-    case 'listCustomers':
-      return repo.listCustomers(db)
+    case "listFilaments":
+      return repo.listFilaments(db);
+    case "createFilament":
+      return repo.createFilament(db, msg.filament as Omit<Filament, "id">);
+    case "deactivateFilament":
+      return repo.deactivateFilament(db, msg.filamentId as string);
+    case "listCustomers":
+      return repo.listCustomers(db);
+
+    // --- Printers (fleet) ----------------------------------------------------
+    case "listPrinters":
+      return repo.listPrinters(db, msg.includeInactive === true);
+    case "createPrinter":
+      return repo.createPrinter(
+        db,
+        msg.printer as Omit<Printer, "id" | "status"> & { id?: string },
+      );
+    case "updatePrinter":
+      return repo.updatePrinter(
+        db,
+        msg.printerId as string,
+        msg.patch as Partial<Omit<Printer, "id" | "status">>,
+      );
+    case "setPrinterStatus":
+      return repo.setPrinterStatus(
+        db,
+        msg.printerId as string,
+        msg.status as PrinterStatus,
+      );
 
     // --- Settings -----------------------------------------------------------
-    case 'getSettings':
-      return repo.getSettings(db)
-    case 'updateSettings':
-      return repo.updateSettings(db, msg.patch as Partial<repo.Settings>)
+    case "getSettings":
+      return repo.getSettings(db);
+    case "updateSettings":
+      return repo.updateSettings(db, msg.patch as Partial<repo.Settings>);
 
     default:
       // Never echo the op back into the response body; it is attacker-controlled
       // input. The caller logs it server-side instead.
-      throw new UnknownOpError(`unknown op`)
+      throw new UnknownOpError(`unknown op`);
   }
 }
